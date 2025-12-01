@@ -302,9 +302,9 @@ class SimServer:
         self.goals = get_goals(self.all_products, self.product_prices, human_goals)
         self.show_attrs = show_attrs
 
-        # Fix outcome for random shuffling of goals
-        random.seed(233)
-        random.shuffle(self.goals)
+        # Keep the goal order deterministic so fixed session IDs map to fixed instructions.
+        # random.seed(233)
+        # random.shuffle(self.goals)
 
         # Apply `filter_goals` parameter if exists to select speific goal(s)
         if filter_goals is not None:

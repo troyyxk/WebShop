@@ -1,5 +1,20 @@
 #!/bin/bash
 
+# Initialize conda for bash shell
+eval "$(conda shell.bash hook)"
+
+# Download file if it doesn't already exist
+download_if_missing() {
+  local url=$1
+  local filename=$2
+  if [ ! -f "$filename" ]; then
+    echo "Downloading $filename..."
+    gdown "$url" -O "$filename" || echo "Warning: Failed to download $filename, continuing..."
+  else
+    echo "$filename already exists, skipping download."
+  fi
+}
+
 # Displays information on how to use script
 helpFunction()
 {
@@ -21,27 +36,34 @@ if [ -z "$data" ]; then
   helpFunction
 fi
 
-# Install Python Dependencies
-pip install -r requirements.txt;
+# Activate webshop conda environment
+conda activate webshop
 
-# Install Environment Dependencies via `conda`
-conda install -c pytorch faiss-cpu;
-conda install -c conda-forge openjdk=11;
+# Install Python Dependencies
+python -m pip install -r requirements.txt;
+
+# Install faiss-cpu via pip (conda version conflicts with Python)
+python -m pip install faiss-cpu;
+
+# Install openjdk via apt if not already installed
+if ! command -v java &> /dev/null; then
+    echo "Java not found, please install openjdk-11-jdk manually with: sudo apt install openjdk-11-jdk"
+fi
 
 # Download dataset into `data` folder via `gdown` command
 mkdir -p data;
 cd data;
 if [ "$data" == "small" ]; then
-  gdown https://drive.google.com/uc?id=1EgHdxQ_YxqIQlvvq5iKlCrkEKR6-j0Ib; # items_shuffle_1000 - product scraped info
-  gdown https://drive.google.com/uc?id=1IduG0xl544V_A_jv3tHXC0kyFi7PnyBu; # items_ins_v2_1000 - product attributes
+  download_if_missing "https://drive.google.com/uc?id=1EgHdxQ_YxqIQlvvq5iKlCrkEKR6-j0Ib" "items_shuffle_1000.json"
+  download_if_missing "https://drive.google.com/uc?id=1IduG0xl544V_A_jv3tHXC0kyFi7PnyBu" "items_ins_v2_1000.json"
 elif [ "$data" == "all" ]; then
-  gdown https://drive.google.com/uc?id=1A2whVgOO0euk5O13n2iYDM0bQRkkRduB; # items_shuffle
-  gdown https://drive.google.com/uc?id=1s2j6NgHljiZzQNL3veZaAiyW_qDEgBNi; # items_ins_v2
+  download_if_missing "https://drive.google.com/uc?id=1A2whVgOO0euk5O13n2iYDM0bQRkkRduB" "items_shuffle.json"
+  download_if_missing "https://drive.google.com/uc?id=1s2j6NgHljiZzQNL3veZaAiyW_qDEgBNi" "items_ins_v2.json"
 else
   echo "[ERROR]: argument for `-d` flag not recognized"
   helpFunction
 fi
-gdown https://drive.google.com/uc?id=14Kb5SPBk_jfdLZ_CDBNitW98QLDlKR5O # items_human_ins
+download_if_missing "https://drive.google.com/uc?id=14Kb5SPBk_jfdLZ_CDBNitW98QLDlKR5O" "items_human_ins.json"
 cd ..
 
 # Download spaCy large NLP model

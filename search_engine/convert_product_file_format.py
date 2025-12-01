@@ -1,3 +1,4 @@
+import os
 import sys
 import json
 from tqdm import tqdm
@@ -6,7 +7,8 @@ sys.path.insert(0, '../')
 from web_agent_site.utils import DEFAULT_FILE_PATH
 from web_agent_site.engine.engine import load_products
 
-all_products, *_ = load_products(filepath=DEFAULT_FILE_PATH)
+NUM_PRODUCTS = int(os.environ.get('WEBSHOP_NUM_PRODUCTS', 100000))
+all_products, *_ = load_products(filepath=DEFAULT_FILE_PATH, num_products=NUM_PRODUCTS)
 
 
 docs = []
