@@ -286,7 +286,7 @@ def confirm_purchase(session_id, asin, keywords, page, options):
                 <p>Selected options: {options_parsed}</p>
                 <hr>
                 <h3>Please select the correct option to complete purchase:</h3>
-                <p class="text-muted">Only one option will complete the purchase, others will return to the product page</p>
+                <p class="text-muted">Only one option will complete the purchase with full reward. Wrong choices will result in 0 score.</p>
             </div>
             <div class="choices-container">
     """

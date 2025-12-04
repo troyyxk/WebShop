@@ -533,7 +533,7 @@ class SimServer:
                     <p>Selected options: {session['options']}</p>
                     <hr>
                     <h3>Please select the correct option to complete purchase:</h3>
-                    <p class="text-muted">Only one option will complete the purchase, others will return to the product page</p>
+                    <p class="text-muted">Only one option will complete the purchase with full reward. Wrong choices will result in 0 score.</p>
                 </div>
                 <div class="choices-container">
         """
@@ -555,8 +555,13 @@ class SimServer:
         return html, url
 
     @app.route('/', methods=['GET', 'POST'])
-    def done(self, session_id, **kwargs):
-        """Render and return HTML for done page"""
+    def done(self, session_id, override_reward=None, **kwargs):
+        """Render and return HTML for done page
+        
+        Args:
+            session_id: Session identifier
+            override_reward: If provided, use this value instead of calculated reward
+        """
         session = self.user_sessions[session_id]
         goal = self.user_sessions[session_id]['goal']
         purchased_product = self.product_item_dict[session["asin"]]
@@ -571,6 +576,11 @@ class SimServer:
             options=session["options"],
             verbose=True
         )
+        
+        # Override reward if specified (e.g., wrong choice in confirm_purchase)
+        if override_reward is not None:
+            reward = override_reward
+            info['override_reward'] = True
 
         self.user_sessions[session_id]['verbose_info'] = info
         self.user_sessions[session_id]['done'] = True
@@ -639,16 +649,17 @@ class SimServer:
                         status['done'] = True
                 elif clickable_name in ['a', 'b', 'c', 'd', 'e'] and session.get('awaiting_confirmation'):
                     # Handle confirmation page choices
+                    session['awaiting_confirmation'] = False
                     if clickable_name == session.get('correct_choice'):
-                        # Correct choice - proceed to done page
-                        session['awaiting_confirmation'] = False
+                        # Correct choice - proceed to done page with full reward
                         html, url, reward = self.done(session_id, **kwargs)
                         status['reward'] = reward
                         status['done'] = True
                     else:
-                        # Wrong choice - go back to item page
-                        session['awaiting_confirmation'] = False
-                        html, url = self.item_page(session_id, **kwargs)
+                        # Wrong choice - proceed to done page with zero reward
+                        html, url, reward = self.done(session_id, override_reward=0, **kwargs)
+                        status['reward'] = reward  # Will be 0
+                        status['done'] = True
                 elif clickable_name == BACK_TO_SEARCH.lower():
                     # If "back to search" clicked, recursively reset the session back to search page
                     html, url, status = self.receive(session_id, current_url)
