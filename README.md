@@ -128,3 +128,25 @@ We would love to hear from the broader NLP and Machine Learning community, and w
 
 ## 🪪 License
 Check `LICENSE.md`
+
+# Data Source
+```
+(base) xingkun@hku00251348gpu:~/webshop$ ls -l ./data/
+total 5542764
+-rw-rw-r-- 1 xingkun xingkun    5137932 Dec  1 14:38 items_human_ins.json
+-rw-rw-r-- 1 xingkun xingkun     147099 Nov 18 01:03 items_ins_v2_1000.json
+-rw-rw-r-- 1 xingkun xingkun  186295270 Jun  7  2022 items_ins_v2.json
+-rw-rw-r-- 1 xingkun xingkun    4467013 Nov 18 01:03 items_shuffle_1000.json
+-rw-rw-r-- 1 xingkun xingkun 5479720229 Nov 18 01:04 items_shuffle.json
+drwxrwxr-x 3 xingkun xingkun       4096 Nov 18 01:03 subsets
+```
+| 文件 | Google Drive 链接 |
+|------|------------------|
+| `items_shuffle_1000.json` | https://drive.google.com/uc?id=1EgHdxQ_YxqIQlvvq5iKlCrkEKR6-j0Ib |
+| `items_ins_v2_1000.json` | https://drive.google.com/uc?id=1IduG0xl544V_A_jv3tHXC0kyFi7PnyBu |
+| `items_shuffle.json` | https://drive.google.com/uc?id=1A2whVgOO0euk5O13n2iYDM0bQRkkRduB |
+| `items_ins_v2.json` | https://drive.google.com/uc?id=1s2j6NgHljiZzQNL3veZaAiyW_qDEgBNi |
+| `items_human_ins.json` | https://drive.google.com/uc?id=14Kb5SPBk_jfdLZ_CDBNitW98QLDlKR5O |
+
+另外你的 `global_verifier/README.md` 中还提到了 Hugging Face 上的镜像：
+> https://huggingface.co/datasets/YWZBrandon/webshop-data/blob/main/items_shuffle_1000.json
