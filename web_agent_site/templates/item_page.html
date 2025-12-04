@@ -78,7 +78,7 @@
         </div>
         <div class="col-sm-2">
           <div class="row top-buffer">
-            <form method="post" action="{{url_for('done', session_id=session_id, asin=asin, options=options )}}">
+            <form method="post" action="{{url_for('confirm_purchase', session_id=session_id, asin=asin, keywords=keywords, page=page, options=options )}}">
               <button type="submit" class="btn btn-lg purchase">Buy Now</button>
             </form>
           </div>

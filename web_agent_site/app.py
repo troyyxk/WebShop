@@ -216,8 +216,111 @@ def item_sub_page(session_id, asin, keywords, page, sub_page, options):
     return html
 
 
-@app.route('/done/<session_id>/<asin>/<options>', methods=['GET', 'POST'])
-def done(session_id, asin, options):
+@app.route('/confirm_purchase/<session_id>/<asin>/<keywords>/<page>/<options>', methods=['GET', 'POST'])
+def confirm_purchase(session_id, asin, keywords, page, options):
+    """Purchase confirmation page - need to select correct option to complete purchase"""
+    import hashlib
+    
+    options_parsed = literal_eval(options)
+    product_info = product_item_dict[asin]
+    goal_instruction = user_sessions[session_id]['goal']['instruction_text']
+    
+    # Generate correct answer index based on session_id (1-5)
+    hash_val = int(hashlib.md5(session_id.encode()).hexdigest(), 16)
+    correct_index = (hash_val % 5) + 1  # 1 to 5
+    
+    # Choice labels
+    choice_labels = ['A', 'B', 'C', 'D', 'E']
+    
+    if user_log_dir is not None:
+        logger = logging.getLogger(session_id)
+        logger.info(json.dumps(dict(
+            page='confirm_purchase',
+            url=request.url,
+            goal=user_sessions[session_id]['goal'],
+            content=dict(
+                asin=asin,
+                options=options_parsed,
+                correct_choice=choice_labels[correct_index - 1],
+            )
+        )))
+    
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+        <style>
+            .choice-btn {{
+                width: 80px;
+                height: 80px;
+                font-size: 24px;
+                font-weight: bold;
+                margin: 10px;
+                border-radius: 10px;
+            }}
+            .choice-btn:hover {{
+                transform: scale(1.1);
+                transition: transform 0.2s;
+            }}
+            .container-center {{
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                min-height: 80vh;
+            }}
+            .choices-container {{
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                margin-top: 30px;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container container-center">
+            <div class="text-center">
+                <h2>Confirm Purchase</h2>
+                <p class="lead">Product: {product_info['Title'][:50]}...</p>
+                <p>Selected options: {options_parsed}</p>
+                <hr>
+                <h3>Please select the correct option to complete purchase:</h3>
+                <p class="text-muted">Only one option will complete the purchase, others will return to the product page</p>
+            </div>
+            <div class="choices-container">
+    """
+    
+    for i, label in enumerate(choice_labels):
+        if i + 1 == correct_index:
+            # Correct choice - go to done page with full reward
+            url = url_for('done', session_id=session_id, asin=asin, options=options, correct=1)
+        else:
+            # Wrong choice - go to done page with zero reward
+            url = url_for('done', session_id=session_id, asin=asin, options=options, correct=0)
+        
+        html += f"""
+                <form method="post" action="{url}" style="display: inline;">
+                    <button type="submit" class="btn btn-primary choice-btn">{label}</button>
+                </form>
+        """
+    
+    html += f"""
+            </div>
+            <div style="margin-top: 40px;">
+                <a href="{url_for('item_page', session_id=session_id, asin=asin, keywords=keywords, page=page, options=options)}" class="btn btn-default">
+                    &lt; Prev
+                </a>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    return html
+
+
+@app.route('/done/<session_id>/<asin>/<options>/<int:correct>', methods=['GET', 'POST'])
+def done(session_id, asin, options, correct):
     options = literal_eval(options)
     goal = user_sessions[session_id]['goal']
     purchased_product = product_item_dict[asin]
@@ -230,6 +333,11 @@ def done(session_id, asin, options):
         options=options,
         verbose=True
     )
+    
+    # If wrong choice was selected, set reward to 0
+    if not correct:
+        reward = 0
+        reward_info['wrong_choice'] = True
     user_sessions[session_id]['done'] = True
     user_sessions[session_id]['reward'] = reward
     print(user_sessions)

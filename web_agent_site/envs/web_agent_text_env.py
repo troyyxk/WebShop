@@ -68,6 +68,7 @@ class WebAgentTextEnv(gym.Env):
             self.kwargs.get('num_products'),
             self.kwargs.get('human_goals'),
             self.kwargs.get('show_attrs', False),
+            self.kwargs.get('enable_confirm_purchase', False),
         ) if server is None else server
         self.browser = SimBrowser(self.server)
 
@@ -284,6 +285,7 @@ class SimServer:
         num_products=None,
         human_goals=0,
         show_attrs=False,
+        enable_confirm_purchase=False,
     ):
         """
         Constructor for simulated server serving WebShop application
@@ -293,9 +295,11 @@ class SimServer:
         limit_goals (`int`) -- Limit to number of goals available
         num_products (`int`) -- Number of products to search across
         human_goals (`bool`) -- If true, load human goals; otherwise, load synthetic goals
+        enable_confirm_purchase (`bool`) -- If true, add confirmation page after clicking "Buy Now"
         """
         # Load all products, goals, and search engine
         self.base_url = base_url
+        self.enable_confirm_purchase = enable_confirm_purchase
         self.all_products, self.product_item_dict, self.product_prices, _ = \
             load_products(filepath=file_path, num_products=num_products, human_goals=human_goals)
         self.search_engine = init_search_engine(num_products=num_products)
@@ -466,6 +470,91 @@ class SimServer:
         return html, url
 
     @app.route('/', methods=['GET', 'POST'])
+    def confirm_purchase(self, session_id, **kwargs):
+        """Render and return HTML for purchase confirmation page with multiple choices"""
+        import hashlib
+        
+        session = self.user_sessions[session_id]
+        product_info = self.product_item_dict[session["asin"]]
+        
+        # Generate correct answer index based on session_id (1-5)
+        hash_val = int(hashlib.md5(session_id.encode()).hexdigest(), 16)
+        correct_index = (hash_val % 5) + 1
+        
+        choice_labels = ['A', 'B', 'C', 'D', 'E']
+        keywords_url_string = '+'.join(session["keywords"]) if session["keywords"] else ''
+        option_string = json.dumps(session['options'])
+        
+        url = (
+            f'{self.base_url}/confirm_purchase/{session_id}/'
+            f'{session["asin"]}/{keywords_url_string}/'
+            f'{session["page"]}/{option_string}'
+        )
+        
+        # Store correct choice in session for later validation
+        session['correct_choice'] = choice_labels[correct_index - 1].lower()
+        session['awaiting_confirmation'] = True
+        
+        # Build HTML for confirmation page
+        html = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+            <style>
+                .choice-btn {{
+                    width: 80px;
+                    height: 80px;
+                    font-size: 24px;
+                    font-weight: bold;
+                    margin: 10px;
+                    border-radius: 10px;
+                }}
+                .container-center {{
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    min-height: 80vh;
+                }}
+                .choices-container {{
+                    display: flex;
+                    flex-wrap: wrap;
+                    justify-content: center;
+                    margin-top: 30px;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container container-center">
+                <div class="text-center">
+                    <h2>Confirm Purchase</h2>
+                    <p class="lead">Product: {product_info['Title'][:50]}...</p>
+                    <p>Selected options: {session['options']}</p>
+                    <hr>
+                    <h3>Please select the correct option to complete purchase:</h3>
+                    <p class="text-muted">Only one option will complete the purchase, others will return to the product page</p>
+                </div>
+                <div class="choices-container">
+        """
+        
+        for label in choice_labels:
+            html += f"""
+                    <button class="btn btn-primary choice-btn">{label}</button>
+            """
+        
+        html += f"""
+                </div>
+                <div style="margin-top: 40px;">
+                    <button class="btn btn-default">&lt; Prev</button>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+        return html, url
+
+    @app.route('/', methods=['GET', 'POST'])
     def done(self, session_id, **kwargs):
         """Render and return HTML for done page"""
         session = self.user_sessions[session_id]
@@ -540,10 +629,26 @@ class SimServer:
             elif 'clickable_name' in kwargs:
                 clickable_name = kwargs['clickable_name'].lower()
                 if clickable_name == END_BUTTON.lower():
-                    # If "buy now" clicked, calculate reward and flag session as terminated
-                    html, url, reward = self.done(session_id, **kwargs)
-                    status['reward'] = reward
-                    status['done'] = True
+                    if self.enable_confirm_purchase:
+                        # If confirm_purchase enabled, go to confirmation page first
+                        html, url = self.confirm_purchase(session_id, **kwargs)
+                    else:
+                        # Otherwise, directly go to done page
+                        html, url, reward = self.done(session_id, **kwargs)
+                        status['reward'] = reward
+                        status['done'] = True
+                elif clickable_name in ['a', 'b', 'c', 'd', 'e'] and session.get('awaiting_confirmation'):
+                    # Handle confirmation page choices
+                    if clickable_name == session.get('correct_choice'):
+                        # Correct choice - proceed to done page
+                        session['awaiting_confirmation'] = False
+                        html, url, reward = self.done(session_id, **kwargs)
+                        status['reward'] = reward
+                        status['done'] = True
+                    else:
+                        # Wrong choice - go back to item page
+                        session['awaiting_confirmation'] = False
+                        html, url = self.item_page(session_id, **kwargs)
                 elif clickable_name == BACK_TO_SEARCH.lower():
                     # If "back to search" clicked, recursively reset the session back to search page
                     html, url, status = self.receive(session_id, current_url)
@@ -570,6 +675,11 @@ class SimServer:
                     # If "prev page" clicked from sub page, return to corresponding item page
                     html, url = self.item_page(session_id, **kwargs)
                 elif (clickable_name == PREV_PAGE.lower() and 
+                      self.get_page_name(current_url) == 'confirm_purchase'):
+                    # If "prev page" clicked from confirmation page, return to item page
+                    session['awaiting_confirmation'] = False
+                    html, url = self.item_page(session_id, **kwargs)
+                elif (clickable_name == PREV_PAGE.lower() and 
                       self.get_page_name(current_url) == 'item_page'):
                     # If "prev page" clicked from item page, return to search results page
                     html, url = self.search_results(
@@ -594,6 +704,7 @@ class SimServer:
             'search_results',
             'item_page',
             'item_sub_page',
+            'confirm_purchase',
             'done'
         ]
         for page_name in page_names:
