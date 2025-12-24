@@ -7,6 +7,10 @@ import torch
 
 import numpy as np
 
+# numpy>=2.0移除了 bool8，给 gym 的旧版检查补一个别名
+if not hasattr(np, "bool8"):
+    np.bool8 = np.bool_
+
 from bs4 import BeautifulSoup
 from bs4.element import Comment
 from collections import defaultdict
@@ -58,6 +62,12 @@ class WebAgentTextEnv(gym.Env):
         self.kwargs = kwargs
 
         self.file_path = file_path
+        # Gym checker requires action_space/observation_space to be defined.
+        # Use placeholders since the environment uses text actions.
+        self.action_space = gym.spaces.Discrete(1)
+        self.observation_space = gym.spaces.Box(
+            low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32
+        )
 
         self.base_url = 'http://127.0.0.1:3000'
         self.server = SimServer(
@@ -94,7 +104,7 @@ class WebAgentTextEnv(gym.Env):
           - click[value]
         If action not valid, perform nothing.
         """
-        info = None
+        info = {}
         self.get_available_actions()
 
         # Determine action type (click, search) and argument
@@ -258,7 +268,8 @@ class WebAgentTextEnv(gym.Env):
         obs = self.observation
         self.prev_obs = [obs]
         self.prev_actions = []
-        return obs, None
+        # Gym >=0.26 expects (obs, info) where info is a dict
+        return obs, {}
 
     def render(self, mode='human'):
         pass
@@ -479,7 +490,10 @@ class SimServer:
         
         # Generate correct answer index based on session_id (1-5)
         hash_val = int(hashlib.md5(session_id.encode()).hexdigest(), 16)
-        correct_index = (hash_val % 5) + 1
+        # correct_index = (hash_val % 5) + 1
+        correct_index = 1  # A
+        # correct_index = 2  # B
+        # correct_index = 2  # B
         
         choice_labels = ['A', 'B', 'C', 'D', 'E']
         keywords_url_string = '+'.join(session["keywords"]) if session["keywords"] else ''

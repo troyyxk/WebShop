@@ -227,7 +227,9 @@ def confirm_purchase(session_id, asin, keywords, page, options):
     
     # Generate correct answer index based on session_id (1-5)
     hash_val = int(hashlib.md5(session_id.encode()).hexdigest(), 16)
-    correct_index = (hash_val % 5) + 1  # 1 to 5
+    # correct_index = (hash_val % 5) + 1  # 1 to 5
+    correct_index = 1  # A
+    # correct_index = 2  # B
     
     # Choice labels
     choice_labels = ['A', 'B', 'C', 'D', 'E']
