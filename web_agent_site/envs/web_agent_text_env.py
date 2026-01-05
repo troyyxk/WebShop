@@ -483,30 +483,19 @@ class SimServer:
     @app.route('/', methods=['GET', 'POST'])
     def confirm_purchase(self, session_id, **kwargs):
         """Render and return HTML for purchase confirmation page with multiple choices"""
-        import hashlib
-        
         session = self.user_sessions[session_id]
-        product_info = self.product_item_dict[session["asin"]]
         
-        # Generate correct answer index based on session_id (1-5)
-        hash_val = int(hashlib.md5(session_id.encode()).hexdigest(), 16)
-        # correct_index = (hash_val % 5) + 1
-        correct_index = 1  # A
-        # correct_index = 2  # B
-        # correct_index = 2  # B
+        # correct_index = 2  # C
+        correct_index = 18  # S
         
-        choice_labels = ['A', 'B', 'C', 'D', 'E']
-        keywords_url_string = '+'.join(session["keywords"]) if session["keywords"] else ''
-        option_string = json.dumps(session['options'])
+        # Choice labels (A-Z, 26 letters)
+        choice_labels = [chr(ord('A') + i) for i in range(26)]
         
-        url = (
-            f'{self.base_url}/confirm_purchase/{session_id}/'
-            f'{session["asin"]}/{keywords_url_string}/'
-            f'{session["page"]}/{option_string}'
-        )
+        url = f'{self.base_url}/confirm_purchase/{session_id}'
         
-        # Store correct choice in session for later validation
-        session['correct_choice'] = choice_labels[correct_index - 1].lower()
+        # Store correct choice in session for later validation (format: "a-0-x", "b-1-x", etc.)
+        correct_letter = choice_labels[correct_index].lower()
+        session['correct_choice'] = f"{correct_letter}-{correct_index}-x"
         session['awaiting_confirmation'] = True
         
         # Build HTML for confirmation page
@@ -543,24 +532,20 @@ class SimServer:
             <div class="container container-center">
                 <div class="text-center">
                     <h2>Confirm Purchase</h2>
-                    <p class="lead">Product: {product_info['Title'][:50]}...</p>
-                    <p>Selected options: {session['options']}</p>
-                    <hr>
                     <h3>Please select the correct option to complete purchase:</h3>
                     <p class="text-muted">Only one option will complete the purchase with full reward. Wrong choices will result in 0 score.</p>
                 </div>
                 <div class="choices-container">
         """
         
-        for label in choice_labels:
+        for i, label in enumerate(choice_labels):
+            # Button text format: [Letter]-[Number]-X (e.g., A-0-X, B-1-X)
+            button_text = f"{label}-{i}-X"
             html += f"""
-                    <button class="btn btn-primary choice-btn">{label}</button>
+                    <button class="btn btn-primary choice-btn">{button_text}</button>
             """
         
-        html += f"""
-                </div>
-                <div style="margin-top: 40px;">
-                    <button class="btn btn-default">&lt; Prev</button>
+        html += """
                 </div>
             </div>
         </body>
@@ -661,8 +646,8 @@ class SimServer:
                         html, url, reward = self.done(session_id, **kwargs)
                         status['reward'] = reward
                         status['done'] = True
-                elif clickable_name in ['a', 'b', 'c', 'd', 'e'] and session.get('awaiting_confirmation'):
-                    # Handle confirmation page choices
+                elif session.get('awaiting_confirmation') and self._is_confirmation_choice(clickable_name):
+                    # Handle confirmation page choices (format: "a-0-x", "b-1-x", etc.)
                     session['awaiting_confirmation'] = False
                     if clickable_name == session.get('correct_choice'):
                         # Correct choice - proceed to done page with full reward
@@ -736,6 +721,13 @@ class SimServer:
             if page_name in url:
                 return page_name
         return ''  # index page
+
+    def _is_confirmation_choice(self, clickable_name):
+        """Check if clickable_name is a confirmation page choice (format: 'a-0-x', 'b-1-x', etc.)"""
+        import re
+        # Match pattern: single letter - single/double digit number - x
+        pattern = r'^[a-z]-\d{1,2}-x$'
+        return bool(re.match(pattern, clickable_name))
 
 
 class SimBrowser:

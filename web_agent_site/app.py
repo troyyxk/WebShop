@@ -151,6 +151,10 @@ def item_page(session_id, asin, keywords, page, options):
     options = literal_eval(options)
     product_info = product_item_dict[asin]
 
+    # Store asin and options in session for confirm_purchase
+    user_sessions[session_id]['asin'] = asin
+    user_sessions[session_id]['options'] = options
+
     goal_instruction = user_sessions[session_id]['goal']['instruction_text']
     product_info['goal_instruction'] = goal_instruction
 
@@ -216,33 +220,26 @@ def item_sub_page(session_id, asin, keywords, page, sub_page, options):
     return html
 
 
-@app.route('/confirm_purchase/<session_id>/<asin>/<keywords>/<page>/<options>', methods=['GET', 'POST'])
-def confirm_purchase(session_id, asin, keywords, page, options):
+@app.route('/confirm_purchase/<session_id>', methods=['GET', 'POST'])
+def confirm_purchase(session_id):
     """Purchase confirmation page - need to select correct option to complete purchase"""
-    import hashlib
+    session = user_sessions[session_id]
+    asin = session.get('asin')
+    options = session.get('options', {})
     
-    options_parsed = literal_eval(options)
-    product_info = product_item_dict[asin]
-    goal_instruction = user_sessions[session_id]['goal']['instruction_text']
-    
-    # Generate correct answer index based on session_id (1-5)
-    hash_val = int(hashlib.md5(session_id.encode()).hexdigest(), 16)
-    # correct_index = (hash_val % 5) + 1  # 1 to 5
     correct_index = 1  # A
     # correct_index = 2  # B
     
-    # Choice labels
-    choice_labels = ['A', 'B', 'C', 'D', 'E']
+    # Choice labels (A-Z, 26 letters)
+    choice_labels = [chr(ord('A') + i) for i in range(26)]
     
     if user_log_dir is not None:
         logger = logging.getLogger(session_id)
         logger.info(json.dumps(dict(
             page='confirm_purchase',
             url=request.url,
-            goal=user_sessions[session_id]['goal'],
+            goal=session['goal'],
             content=dict(
-                asin=asin,
-                options=options_parsed,
                 correct_choice=choice_labels[correct_index - 1],
             )
         )))
@@ -284,35 +281,30 @@ def confirm_purchase(session_id, asin, keywords, page, options):
         <div class="container container-center">
             <div class="text-center">
                 <h2>Confirm Purchase</h2>
-                <p class="lead">Product: {product_info['Title'][:50]}...</p>
-                <p>Selected options: {options_parsed}</p>
-                <hr>
                 <h3>Please select the correct option to complete purchase:</h3>
                 <p class="text-muted">Only one option will complete the purchase with full reward. Wrong choices will result in 0 score.</p>
             </div>
             <div class="choices-container">
     """
     
+    options_str = str(options)
     for i, label in enumerate(choice_labels):
         if i + 1 == correct_index:
             # Correct choice - go to done page with full reward
-            url = url_for('done', session_id=session_id, asin=asin, options=options, correct=1)
+            done_url = url_for('done', session_id=session_id, asin=asin, options=options_str, correct=1)
         else:
             # Wrong choice - go to done page with zero reward
-            url = url_for('done', session_id=session_id, asin=asin, options=options, correct=0)
+            done_url = url_for('done', session_id=session_id, asin=asin, options=options_str, correct=0)
         
+        # Button text format: [Letter]-[Number]-X (e.g., A-0-X, B-1-X)
+        button_text = f"{label}-{i}-X"
         html += f"""
-                <form method="post" action="{url}" style="display: inline;">
-                    <button type="submit" class="btn btn-primary choice-btn">{label}</button>
+                <form method="post" action="{done_url}" style="display: inline;">
+                    <button type="submit" class="btn btn-primary choice-btn">{button_text}</button>
                 </form>
         """
     
-    html += f"""
-            </div>
-            <div style="margin-top: 40px;">
-                <a href="{url_for('item_page', session_id=session_id, asin=asin, keywords=keywords, page=page, options=options)}" class="btn btn-default">
-                    &lt; Prev
-                </a>
+    html += """
             </div>
         </div>
     </body>
