@@ -79,6 +79,7 @@ class WebAgentTextEnv(gym.Env):
             self.kwargs.get('human_goals'),
             self.kwargs.get('show_attrs', False),
             self.kwargs.get('enable_confirm_purchase', False),
+            self.kwargs.get('correct_index', 0),
         ) if server is None else server
         self.browser = SimBrowser(self.server)
 
@@ -297,6 +298,7 @@ class SimServer:
         human_goals=0,
         show_attrs=False,
         enable_confirm_purchase=False,
+        correct_index=0,
     ):
         """
         Constructor for simulated server serving WebShop application
@@ -307,10 +309,12 @@ class SimServer:
         num_products (`int`) -- Number of products to search across
         human_goals (`bool`) -- If true, load human goals; otherwise, load synthetic goals
         enable_confirm_purchase (`bool`) -- If true, add confirmation page after clicking "Buy Now"
+        correct_index (`int`) -- Index of correct choice in confirm_purchase page (default 3 = 'e')
         """
         # Load all products, goals, and search engine
         self.base_url = base_url
         self.enable_confirm_purchase = enable_confirm_purchase
+        self.correct_index = correct_index
         self.all_products, self.product_item_dict, self.product_prices, _ = \
             load_products(filepath=file_path, num_products=num_products, human_goals=human_goals)
         self.search_engine = init_search_engine(num_products=num_products)
@@ -485,11 +489,12 @@ class SimServer:
         """Render and return HTML for purchase confirmation page with multiple choices"""
         session = self.user_sessions[session_id]
         
-        # correct_index = 2  # C
-        correct_index = 18  # S
+        # Use correct_index from self (passed from outside)
+        correct_index = self.correct_index
         
         # Choice labels (A-Z, 26 letters)
-        choice_labels = [chr(ord('A') + i) for i in range(26)]
+        # choice_labels = [chr(ord('A') + i) for i in range(26)]
+        choice_labels = ['a', 'b', 'c', 'e', 'f', 'g']
         
         url = f'{self.base_url}/confirm_purchase/{session_id}'
         
