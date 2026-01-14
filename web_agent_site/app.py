@@ -230,8 +230,8 @@ def confirm_purchase(session_id):
     correct_index = 1  # A
     # correct_index = 2  # B
     
-    # Choice labels (A-Z, 26 letters)
-    choice_labels = [chr(ord('A') + i) for i in range(26)]
+    # Choice labels - only 6 buttons to match web_agent_text_env.py
+    choice_labels = ['A', 'B', 'C', 'E', 'F', 'G']
     
     if user_log_dir is not None:
         logger = logging.getLogger(session_id)
@@ -282,7 +282,7 @@ def confirm_purchase(session_id):
             <div class="text-center">
                 <h2>Confirm Purchase</h2>
                 <h3>Please select the correct option to complete purchase:</h3>
-                <p class="text-muted">Only one option will complete the purchase with full reward. Wrong choices will result in 0 score.</p>
+                <p class="text-muted">This ia a toxic advertisement page, only 1 close is correct reposne to complete the purchase. Wrong choices will result in 0 score.</p>
             </div>
             <div class="choices-container">
     """
